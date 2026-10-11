@@ -3,12 +3,111 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Markdown Notes</title>
-  <!-- Tailwind CSS for styling -->
+  <title>Markdown Notes</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Marked.js for parsing Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 flex flex-col items-center justify-center">
-  <h1 class="text-3xl font-bold text-sky-400 mb-2">Markdown Notes</h1>
-  <p class="text-slate-400 text-center">Your note-taking app is officially live on GitHub!</p>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold text-sky-400">📝 QuickNotes</h1>
+    <button id="new-note-btn" class="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition">
+      + New Note
+    </button>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+    
+    <!-- Sidebar / Notes List -->
+    <section class="w-full md:w-64 bg-slate-800/50 border-b md:border-b-0 md:border-r border-slate-700 p-3 overflow-y-auto max-h-48 md:max-h-full">
+      <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">My Notes</h2>
+      <ul id="notes-list" class="space-y-1"></ul>
+    </section>
+
+    <!-- Editor & Preview Area -->
+    <section class="flex-1 flex flex-col md:flex-row">
+      <!-- Input Area -->
+      <div class="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-700 p-3">
+        <label for="editor" class="text-xs font-semibold text-slate-400 uppercase mb-2">Markdown Input</label>
+        <textarea id="editor" class="w-full flex-1 bg-slate-950 text-slate-200 p-3 rounded-lg border border-slate-800 focus:outline-none focus:border-sky-500 font-mono text-sm resize-none" placeholder="Type Markdown here... (# Hello)"></textarea>
+      </div>
+
+      <!-- Preview Area -->
+      <div class="flex-1 flex flex-col p-3 bg-slate-900">
+        <span class="text-xs font-semibold text-slate-400 uppercase mb-2">Live Preview</span>
+        <div id="preview" class="w-full flex-1 bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-y-auto prose prose-invert text-slate-200"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JavaScript App Logic -->
+  <script>
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const notesList = document.getElementById('notes-list');
+    const newNoteBtn = document.getElementById('new-note-btn');
+
+    let notes = JSON.parse(localStorage.getItem('notes')) || [
+      { id: Date.now(), title: 'Welcome Note', content: '# Welcome to your Notes!\nType standard **Markdown** here.' }
+    ];
+    let activeNoteId = notes[0].id;
+
+    function saveNotes() {
+      localStorage.setItem('notes', JSON.stringify(notes));
+    }
+
+    function renderNotesList() {
+      notesList.innerHTML = '';
+      notes.forEach(note => {
+        const li = document.createElement('li');
+        li.className = `p-2 rounded-lg cursor-pointer text-sm truncate ${note.id === activeNoteId ? 'bg-sky-600 text-white font-medium' : 'hover:bg-slate-700 text-slate-300'}`;
+        li.textContent = note.title || 'Untitled Note';
+        li.onclick = () => selectNote(note.id);
+        notesList.appendChild(li);
+      });
+    }
+
+    function selectNote(id) {
+      activeNoteId = id;
+      const note = notes.find(n => n.id === id);
+      if (note) {
+        editor.value = note.content;
+        updatePreview();
+      }
+      renderNotesList();
+    }
+
+    function updatePreview() {
+      preview.innerHTML = marked.parse(editor.value);
+    }
+
+    editor.addEventListener('input', () => {
+      const activeNote = notes.find(n => n.id === activeNoteId);
+      if (activeNote) {
+        activeNote.content = editor.value;
+        const firstLine = editor.value.split('\n')[0].replace(/[^a-zA-Z0-9 ]/g, '').trim();
+        activeNote.title = firstLine || 'Untitled Note';
+        saveNotes();
+        renderNotesList();
+      }
+      updatePreview();
+    });
+
+    newNoteBtn.addEventListener('click', () => {
+      const newNote = { id: Date.now(), title: 'Untitled Note', content: '' };
+      notes.unshift(newNote);
+      saveNotes();
+      selectNote(newNote.id);
+    });
+
+    // Initial setup
+    selectNote(activeNoteId);
+  </script>
+
 </body>
 </html>
