@@ -3,20 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Markdown Notes</title>
-  <!-- Tailwind CSS -->
+  <title>QuickNotes Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Marked.js for parsing Markdown -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
 
+  <!-- PIN Lock Screen (Hidden by default unless a PIN is set) -->
+  <div id="lock-screen" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-sm text-center shadow-xl">
+      <h2 class="text-xl font-bold text-sky-400 mb-2">🔒 Locked Note App</h2>
+      <p class="text-xs text-slate-400 mb-4">Enter your 4-digit PIN to unlock</p>
+      <input type="password" id="pin-input" maxlength="4" class="w-32 text-center text-2xl tracking-widest bg-slate-950 border border-slate-700 rounded-lg py-2 mb-4 text-white focus:outline-none focus:border-sky-500" placeholder="••••">
+      <div>
+        <button id="unlock-btn" class="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-semibold w-full">Unlock</button>
+      </div>
+      <p id="pin-error" class="text-red-400 text-xs mt-2 hidden">Incorrect PIN</p>
+    </div>
+  </div>
+
   <!-- Header -->
   <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
-    <h1 class="text-xl font-bold text-sky-400">📝 QuickNotes</h1>
-    <button id="new-note-btn" class="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition">
-      + New Note
-    </button>
+    <div class="flex items-center space-x-2">
+      <h1 class="text-xl font-bold text-sky-400">📝 QuickNotes</h1>
+      <span id="save-status" class="text-xs text-emerald-400 font-medium hidden">Saved ✓</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button id="lock-toggle-btn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium transition">🔒 Set PIN</button>
+      <button id="new-note-btn" class="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition">+ New</button>
+    </div>
   </header>
 
   <!-- Main Container -->
@@ -24,7 +39,9 @@
     
     <!-- Sidebar / Notes List -->
     <section class="w-full md:w-64 bg-slate-800/50 border-b md:border-b-0 md:border-r border-slate-700 p-3 overflow-y-auto max-h-48 md:max-h-full">
-      <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">My Notes</h2>
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">My Notes</h2>
+      </div>
       <ul id="notes-list" class="space-y-1"></ul>
     </section>
 
@@ -32,8 +49,11 @@
     <section class="flex-1 flex flex-col md:flex-row">
       <!-- Input Area -->
       <div class="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-700 p-3">
-        <label for="editor" class="text-xs font-semibold text-slate-400 uppercase mb-2">Markdown Input</label>
-        <textarea id="editor" class="w-full flex-1 bg-slate-950 text-slate-200 p-3 rounded-lg border border-slate-800 focus:outline-none focus:border-sky-500 font-mono text-sm resize-none" placeholder="Type Markdown here... (# Hello)"></textarea>
+        <div class="flex justify-between items-center mb-2">
+          <label for="editor" class="text-xs font-semibold text-slate-400 uppercase">Markdown Input</label>
+          <button id="save-btn" class="bg-slate-700 hover:bg-slate-600 text-sky-300 text-xs px-2.5 py-1 rounded transition font-medium">💾 Save Note</button>
+        </div>
+        <textarea id="editor" class="w-full flex-1 bg-slate-950 text-slate-200 p-3 rounded-lg border border-slate-800 focus:outline-none focus:border-sky-500 font-mono text-sm resize-none" placeholder="Type Markdown here..."></textarea>
       </div>
 
       <!-- Preview Area -->
@@ -45,27 +65,74 @@
 
   </main>
 
-  <!-- JavaScript App Logic -->
+  <!-- App Logic -->
   <script>
     const editor = document.getElementById('editor');
     const preview = document.getElementById('preview');
     const notesList = document.getElementById('notes-list');
     const newNoteBtn = document.getElementById('new-note-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const saveStatus = document.getElementById('save-status');
+    const lockScreen = document.getElementById('lock-screen');
+    const pinInput = document.getElementById('pin-input');
+    const unlockBtn = document.getElementById('unlock-btn');
+    const pinError = document.getElementById('pin-error');
+    const lockToggleBtn = document.getElementById('lock-toggle-btn');
 
     let notes = JSON.parse(localStorage.getItem('notes')) || [
-      { id: Date.now(), title: 'Welcome Note', content: '# Welcome to your Notes!\nType standard **Markdown** here.' }
+      { id: Date.now(), title: 'Welcome Note', content: '# Welcome to QuickNotes!\n- Type Markdown here\n- Use buttons to rename, delete, or save.' }
     ];
     let activeNoteId = notes[0]?.id || null;
+    let appPin = localStorage.getItem('app_pin') || null;
 
-    function saveNotes() {
+    // Check Lock on Startup
+    if (appPin) {
+      lockScreen.classList.remove('hidden');
+    }
+
+    unlockBtn.addEventListener('click', () => {
+      if (pinInput.value === appPin) {
+        lockScreen.classList.add('hidden');
+        pinInput.value = '';
+        pinError.classList.add('hidden');
+      } else {
+        pinError.classList.remove('hidden');
+      }
+    });
+
+    lockToggleBtn.addEventListener('click', () => {
+      if (appPin) {
+        if (confirm("Remove 4-digit PIN lock?")) {
+          localStorage.removeItem('app_pin');
+          appPin = null;
+          lockToggleBtn.textContent = "🔒 Set PIN";
+          alert("PIN removed successfully!");
+        }
+      } else {
+        const newPin = prompt("Enter a new 4-digit PIN:");
+        if (newPin && newPin.length === 4 && !isNaN(newPin)) {
+          localStorage.setItem('app_pin', newPin);
+          appPin = newPin;
+          lockToggleBtn.textContent = "🔓 Remove PIN";
+          alert("PIN set successfully!");
+        } else if (newPin) {
+          alert("Please enter a valid 4-digit number.");
+        }
+      }
+    });
+
+    if (appPin) lockToggleBtn.textContent = "🔓 Remove PIN";
+
+    function saveToStorage() {
       localStorage.setItem('notes', JSON.stringify(notes));
+      saveStatus.classList.remove('hidden');
+      setTimeout(() => saveStatus.classList.add('hidden'), 2000);
     }
 
     function renderNotesList() {
       notesList.innerHTML = '';
-      
       if (notes.length === 0) {
-        notesList.innerHTML = '<li class="text-xs text-slate-500 p-2">No notes yet. Click "+ New Note" above!</li>';
+        notesList.innerHTML = '<li class="text-xs text-slate-500 p-2">No notes available.</li>';
         editor.value = '';
         preview.innerHTML = '';
         return;
@@ -73,25 +140,49 @@
 
       notes.forEach(note => {
         const li = document.createElement('li');
-        li.className = `p-2 rounded-lg cursor-pointer text-sm flex justify-between items-center group ${note.id === activeNoteId ? 'bg-sky-600 text-white font-medium' : 'hover:bg-slate-700 text-slate-300'}`;
+        li.className = `p-2 rounded-lg text-sm flex justify-between items-center group ${note.id === activeNoteId ? 'bg-sky-600 text-white font-medium' : 'hover:bg-slate-800 text-slate-300'}`;
         
         const titleSpan = document.createElement('span');
-        titleSpan.className = 'truncate flex-1';
+        titleSpan.className = 'truncate flex-1 cursor-pointer';
         titleSpan.textContent = note.title || 'Untitled Note';
         titleSpan.onclick = () => selectNote(note.id);
+
+        // Actions wrapper
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'flex items-center space-x-1';
+
+        // Rename Button
+        const renameBtn = document.createElement('button');
+        renameBtn.textContent = '✏️';
+        renameBtn.className = 'text-xs p-1 hover:bg-slate-700 rounded transition';
+        renameBtn.title = 'Rename note';
+        renameBtn.onclick = (e) => {
+          e.stopPropagation();
+          const newTitle = prompt("Enter new title for note:", note.title);
+          if (newTitle !== null && newTitle.trim() !== '') {
+            note.title = newTitle.trim();
+            saveToStorage();
+            renderNotesList();
+          }
+        };
 
         // Delete Button
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
-        delBtn.className = 'text-xs p-1 hover:bg-red-500 rounded ml-2 transition';
+        delBtn.className = 'text-xs p-1 hover:bg-red-500 rounded transition';
         delBtn.title = 'Delete note';
         delBtn.onclick = (e) => {
           e.stopPropagation();
-          deleteNote(note.id);
+          if (confirm("Are you sure you want to delete this note?")) {
+            deleteNote(note.id);
+          }
         };
 
+        actionsDiv.appendChild(renameBtn);
+        actionsDiv.appendChild(delBtn);
+
         li.appendChild(titleSpan);
-        li.appendChild(delBtn);
+        li.appendChild(actionsDiv);
         notesList.appendChild(li);
       });
     }
@@ -111,7 +202,7 @@
       if (activeNoteId === id) {
         activeNoteId = notes.length > 0 ? notes[0].id : null;
       }
-      saveNotes();
+      saveToStorage();
       if (activeNoteId) {
         selectNote(activeNoteId);
       } else {
@@ -127,22 +218,22 @@
       const activeNote = notes.find(n => n.id === activeNoteId);
       if (activeNote) {
         activeNote.content = editor.value;
-        const firstLine = editor.value.split('\n')[0].replace(/[^a-zA-Z0-9 ]/g, '').trim();
-        activeNote.title = firstLine || 'Untitled Note';
-        saveNotes();
-        renderNotesList();
+        saveToStorage();
       }
       updatePreview();
+    });
+
+    saveBtn.addEventListener('click', () => {
+      saveToStorage();
     });
 
     newNoteBtn.addEventListener('click', () => {
       const newNote = { id: Date.now(), title: 'Untitled Note', content: '' };
       notes.unshift(newNote);
-      saveNotes();
+      saveToStorage();
       selectNote(newNote.id);
     });
 
-    // Initial setup
     if (activeNoteId) {
       selectNote(activeNoteId);
     } else {
